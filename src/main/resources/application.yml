@@ -1,0 +1,43 @@
+services:
+  call-service:
+    build: .
+    ports:
+      - "8093:8093"
+    environment:
+      SERVER_PORT: ${SERVER_PORT}
+      DB_URI: ${DB_URI}
+      DB_NAME: ${DB_NAME}
+      SPRING_DATA_MONGODB_AUTO_INDEX_CREATION: ${SPRING_DATA_MONGODB_AUTO_INDEX_CREATION}
+      USERS_BASE: ${USERS_BASE}
+      USERS_PUBLIC_PATH: ${USERS_PUBLIC_PATH}
+      RESERVATIONS_BASE: ${RESERVATIONS_BASE}
+      UPLEARN_ALLOWED_ORIGINS: ${UPLEARN_ALLOWED_ORIGINS}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      TURN_USERNAME: ${TURN_USERNAME}
+      TURN_PASSWORD: ${TURN_PASSWORD}
+      ICE_SERVERS_JSON: >
+        [{"urls":["stun:stun1.l.google.com:19302"]},
+         {"urls":["turn:localhost:3478?transport=udp","turn:localhost:3478?transport=tcp"],
+          "username":"${TURN_USERNAME}","credential":"${TURN_PASSWORD}"}]
+    depends_on:
+      - coturn
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  coturn:
+    image: instrumentisto/coturn
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+    environment:
+      - TURN_USERNAME=${TURN_USERNAME}
+      - TURN_PASSWORD=${TURN_PASSWORD}
+    command: >
+      --lt-cred-mech
+      --user ${TURN_USERNAME}:${TURN_PASSWORD}
+      --fingerprint
+      --realm uplearn.local
+      --no-cli
+      --no-tls
+      --no-dtls
