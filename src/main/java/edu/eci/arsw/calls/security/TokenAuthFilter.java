@@ -1,9 +1,7 @@
 package edu.eci.arsw.calls.security;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -14,9 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.stream.Collectors;
-/**
- * Filtro de autenticación basado en tokens Bearer
- */
+
 @Component
 public class TokenAuthFilter extends OncePerRequestFilter {
     private final AuthorizationService authorizationService;
@@ -25,11 +21,9 @@ public class TokenAuthFilter extends OncePerRequestFilter {
         this.authorizationService = authorizationService;
     }
 
-    /**
-     * Procesa la autenticación basada en tokens Bearer
-     */
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
         try {
             String bearer = request.getHeader(HttpHeaders.AUTHORIZATION);
             if (bearer != null) {

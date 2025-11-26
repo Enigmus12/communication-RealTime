@@ -1,14 +1,12 @@
 package edu.eci.arsw.calls.ws;
 
-/**
- * Sobre de mensaje para comunicación WebSocket
- */
 public class MessageEnvelope {
-    public String type; // JOIN|OFFER|ANSWER|ICE_CANDIDATE|HEARTBEAT|LEAVE|END|ERROR
+    // JOIN|OFFER|ANSWER|ICE_CANDIDATE|RTC_CONNECTED|HEARTBEAT|LEAVE|END|ERROR|PEER_JOINED|PEER_LEFT
+    public String type;
     public String sessionId;
     public String reservationId;
     public String from;
-    public String to; // peer|userId|broadcast
+    public String to;
     public Object payload;
     public long ts;
     public String traceId;

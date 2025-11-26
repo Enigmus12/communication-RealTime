@@ -1,19 +1,14 @@
 package edu.eci.arsw.calls.domain;
 
-/**
- * Representa un participante en una sesión de llamada
- */
 public class Participant {
     private String userId;
     private String role; // STUDENT|TUTOR
     private Long joinedAt;
     private Long leftAt;
 
-    public Participant(){}
+    public Participant() {}
     public Participant(String userId, String role, Long joinedAt) {
-        this.userId = userId;
-        this.role = role;
-        this.joinedAt = joinedAt;
+        this.userId = userId; this.role = role; this.joinedAt = joinedAt;
     }
 
     public String getUserId() { return userId; }
