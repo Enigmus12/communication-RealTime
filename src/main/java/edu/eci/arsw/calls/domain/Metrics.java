@@ -1,5 +1,8 @@
 package edu.eci.arsw.calls.domain;
 
+/**
+ * Métricas relacionadas con una sesión de llamada
+ */
 public class Metrics {
     private long setupMs;
     private long totalDurationMs;
