@@ -6,14 +6,20 @@ import edu.eci.arsw.calls.domain.CallSession;
 import edu.eci.arsw.calls.pubsub.RedisPubSubBridge;
 import edu.eci.arsw.calls.service.CallSessionService;
 import edu.eci.arsw.calls.service.EligibilityService;
-import org.slf4j.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.*;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -33,14 +39,16 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
     private final int rateLimit;
 
     private final Map<String, SimpleRateLimiter> limiters = new ConcurrentHashMap<>();
+    /** Evita suscribirse más de una vez al mismo canal */
+    private final Set<String> subscribedChannels = ConcurrentHashMap.newKeySet();
 
     public CallWebSocketHandler(SessionRegistry registry,
-            CallSessionService callService,
-            EligibilityService eligibilityService,
-            RedisPubSubBridge bridge,
-            @Value("${WS_HEARTBEAT_SECONDS:10}") int heartbeatSeconds,
-            @Value("${WS_IDLE_TIMEOUT_SECONDS:30}") int idleTimeoutSeconds,
-            @Value("${WS_RATE_LIMIT:20}") int rateLimit) {
+                                CallSessionService callService,
+                                EligibilityService eligibilityService,
+                                RedisPubSubBridge bridge,
+                                @Value("${WS_HEARTBEAT_SECONDS:10}") int heartbeatSeconds,
+                                @Value("${WS_IDLE_TIMEOUT_SECONDS:30}") int idleTimeoutSeconds,
+                                @Value("${WS_RATE_LIMIT:20}") int rateLimit) {
         this.registry = registry;
         this.callService = callService;
         this.eligibilityService = eligibilityService;
@@ -61,8 +69,9 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
             }
 
             MessageEnvelope env = om.readValue(message.getPayload(), MessageEnvelope.class);
-            if (env.traceId == null || env.traceId.isBlank())
+            if (env.traceId == null || env.traceId.isBlank()) {
                 env.traceId = ulid.nextULID();
+            }
             MDC.put("traceId", env.traceId);
             MDC.put("sessionId", env.sessionId);
 
@@ -70,8 +79,7 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
                 case "JOIN" -> onJoin(session, userId, env);
                 case "OFFER", "ANSWER", "ICE_CANDIDATE" -> forwardAndInspect(env);
                 case "RTC_CONNECTED" -> onRtcConnected(env);
-                case "HEARTBEAT" -> {
-                    /* keepalive */ }
+                case "HEARTBEAT" -> { /* keepalive */ }
                 case "LEAVE", "END" -> onEnd(env);
                 default -> sendError(session, "Unsupported type");
             }
@@ -80,13 +88,9 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
             try {
                 sendError(session, "500: " + ex.getClass().getSimpleName() + ": "
                         + (ex.getMessage() == null ? "no message" : ex.getMessage()));
-            } catch (Exception ignore) {
-            }
+            } catch (Exception ignore) { /* noop */ }
             if (session.isOpen()) {
-                try {
-                    session.close(CloseStatus.SERVER_ERROR);
-                } catch (Exception ignore) {
-                }
+                try { session.close(CloseStatus.SERVER_ERROR); } catch (Exception ignore) { /* noop */ }
             }
         } finally {
             MDC.clear();
@@ -104,89 +108,114 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
         }
-        if (env.reservationId == null || env.reservationId.isBlank()) {
-            sendError(session, "Missing reservationId");
+
+        // Resolver reservationId sin reasignaciones (para que sea efectivamente final)
+        final String resolvedReservationId = (
+                env.reservationId == null || env.reservationId.isBlank()
+        ) ? callService.findBySessionId(env.sessionId)
+                .map(CallSession::getReservationId)
+                .orElse(null)
+          : env.reservationId;
+
+        if (resolvedReservationId == null || resolvedReservationId.isBlank()) {
+            sendError(session, "Missing reservationId and unknown sessionId");
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
         }
 
+        // Elegibilidad
         String bearer = (String) session.getAttributes().get("token");
-        var elig = eligibilityService.checkReservation(env.reservationId, userId, bearer);
+        var elig = eligibilityService.checkReservation(resolvedReservationId, userId, bearer);
         if (!elig.eligible()) {
             sendError(session, "403: " + elig.reason());
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
         }
 
-        // Crea/recupera sesión
+        // Crea o recupera sesión (validando que coincida la reserva)
         CallSession cs = callService.findBySessionId(env.sessionId)
-                .orElseGet(() -> callService.create(env.reservationId));
+                .map(existing -> {
+                    if (!Objects.equals(existing.getReservationId(), resolvedReservationId)) {
+                        throw new IllegalStateException("Session mismatches reservation");
+                    }
+                    return existing;
+                })
+                .orElseGet(() -> callService.create(resolvedReservationId));
 
-        // Limitar a 2 participantes
-        if (registry.get(cs.getSessionId()).size() >= 2) {
+        // Límite de 2 participantes (null-safe)
+        var participants = registry.get(cs.getSessionId());
+        int count = (participants == null) ? 0 : participants.size();
+        if (count >= 2) {
             sendError(session, "Room full");
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
         }
 
-        boolean initiator = registry.get(cs.getSessionId()).isEmpty();
+        boolean initiator = (count == 0);
 
+        // Registrar
         registry.register(cs.getSessionId(), userId, session);
         session.getAttributes().put("callSessionId", cs.getSessionId());
         session.getAttributes().put("callUserId", userId);
+        session.getAttributes().put("callReservationId", cs.getReservationId());
 
+        // Suscripción (idempotente por canal)
         String channel = "call:" + cs.getSessionId();
-        try {
-            bridge.subscribe(channel, payload -> {
-                try {
-                    var sessions = registry.get(cs.getSessionId());
-                    if (sessions == null || sessions.isEmpty())
-                        return;
-                    for (var entry : sessions.entrySet()) {
-                        if (entry.getValue().isOpen())
-                            entry.getValue().sendMessage(new TextMessage(payload));
+        if (subscribedChannels.add(channel)) {
+            try {
+                bridge.subscribe(channel, payload -> {
+                    try {
+                        var msg = om.readValue(payload, MessageEnvelope.class);
+                        var sessMap = registry.get(cs.getSessionId());
+                        if (sessMap == null || sessMap.isEmpty()) return;
+
+                        for (var entry : sessMap.entrySet()) {
+                            String targetUserId = entry.getKey();
+                            var ws = entry.getValue();
+                            if (!Objects.equals(targetUserId, msg.from) && ws.isOpen()) {
+                                ws.sendMessage(new TextMessage(payload));
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("PubSub fanout failed", e);
                     }
-                } catch (Exception e) {
-                    log.warn("PubSub fanout failed", e);
-                }
-            });
-        } catch (Exception e) {
-            log.warn("No se pudo suscribir a Redis. Fallback local. {}", e.toString());
+                });
+            } catch (Exception e) {
+                log.warn("No se pudo suscribir a Redis. Fallback local. {}", e.toString());
+            }
         }
 
-        // ACK
+        // JOIN_ACK
         MessageEnvelope ack = new MessageEnvelope();
         ack.type = "JOIN_ACK";
         ack.sessionId = cs.getSessionId();
-        ack.reservationId = env.reservationId;
+        ack.reservationId = cs.getReservationId();
         ack.from = "server";
         ack.to = userId;
         ack.ts = System.currentTimeMillis();
         ack.traceId = env.traceId;
-        ack.payload = Map.of("initiator", initiator); // 👈 clave
+        ack.payload = Map.of("initiator", initiator);
         session.sendMessage(new TextMessage(om.writeValueAsString(ack)));
-        // Broadcast JOINED
+
+        // PEER_JOINED (broadcast)
         MessageEnvelope joined = new MessageEnvelope();
         joined.type = "PEER_JOINED";
         joined.sessionId = cs.getSessionId();
-        joined.reservationId = env.reservationId;
+        joined.reservationId = cs.getReservationId();
         joined.from = userId;
         joined.ts = System.currentTimeMillis();
         bridge.publish(channel, om.writeValueAsString(joined));
     }
 
     private void forwardAndInspect(MessageEnvelope env) throws IOException {
-        // Señalización normal
         String payloadStr = om.writeValueAsString(env);
         bridge.publish("call:" + env.sessionId, payloadStr);
 
-        // Marcar TURN si el candidato incluye typ relay
+        // Detecta uso de TURN
         if ("ICE_CANDIDATE".equals(env.type) && env.payload instanceof Map<?, ?> map) {
             Object cand = map.get("candidate");
             if (cand != null && String.valueOf(cand).contains(" typ relay")) {
-                callService.findBySessionId(env.sessionId).ifPresent(cs -> {
-                    cs.setTurnUsed(true);
-                });
+                callService.findBySessionId(env.sessionId).ifPresent(cs -> cs.setTurnUsed(true));
             }
         }
     }
@@ -224,7 +253,6 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
                 left.ts = System.currentTimeMillis();
                 bridge.publish("call:" + sid, new ObjectMapper().writeValueAsString(left));
             }
-        } catch (Exception ignore) {
-        }
+        } catch (Exception ignore) { /* noop */ }
     }
 }
