@@ -6,24 +6,19 @@ services:
       - "8093:8093"
     env_file: .env
     environment:
-      # Fuerza 8093 dentro del contenedor
       SERVER_PORT: "8093"
-      # (Opcional, doble seguro por si algo ignora application.yml)
       JAVA_TOOL_OPTIONS: "-Dserver.port=8093"
 
-      # Accesos a servicios del host
       USERS_BASE: "http://host.docker.internal:8080/Api-user"
       REDIS_HOST: "host.docker.internal"
       REDIS_PORT: "6379"
 
-      # Habilita CORS para tus frontends
       UPLEARN_ALLOWED_ORIGINS: "${UPLEARN_ALLOWED_ORIGINS}"
 
-      # ICE: usa el servicio coturn del compose (NO localhost)
-      ICE_SERVERS_JSON: >-
-        [{"urls":["stun:stun1.l.google.com:19302","stun:coturn:3478"]},
-         {"urls":["turn:coturn:3478?transport=udp","turn:coturn:3478?transport=tcp"],
-          "username":"${TURN_USERNAME}","credential":"${TURN_PASSWORD}"}]
+      STUN_URLS: "${STUN_URLS}"
+      TURN_URLS: "${TURN_URLS}"
+      TURN_USERNAME: "${TURN_USERNAME}"
+      TURN_PASSWORD: "${TURN_PASSWORD}"
 
     depends_on:
       - coturn
