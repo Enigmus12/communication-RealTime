@@ -7,10 +7,15 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.*;
 
+/**
+ * Configuración de Redis para la aplicación.
+ */
 @Configuration
 public class RedisConfig {
-    @Value("${REDIS_HOST:localhost}") private String host;
-    @Value("${REDIS_PORT:6379}") private int port;
+    @Value("${REDIS_HOST:localhost}")
+    private String host;
+    @Value("${REDIS_PORT:6379}")
+    private int port;
 
     @Bean
     public LettuceConnectionFactory redisConnectionFactory() {

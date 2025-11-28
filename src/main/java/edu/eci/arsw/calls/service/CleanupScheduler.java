@@ -7,6 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.*;
 import org.springframework.stereotype.Component;
 
+/**
+ * Scheduler para limpiar sesiones de llamadas antiguas.
+ */
 @Component
 public class CleanupScheduler {
     private static final Logger log = LoggerFactory.getLogger(CleanupScheduler.class);
@@ -16,11 +19,16 @@ public class CleanupScheduler {
     private final long maxMinutesMs;
 
     public CleanupScheduler(CallSessionRepository repo, CallSessionService service,
-                            @Value("${CALL_MAX_MINUTES:60}") long maxMinutes) {
-        this.repo = repo; this.service = service;
+            @Value("${CALL_MAX_MINUTES:60}") long maxMinutes) {
+        this.repo = repo;
+        this.service = service;
         this.maxMinutesMs = maxMinutes * 60_000L;
     }
 
+    /**
+     * Método programado para finalizar automáticamente sesiones de llamadas
+     * antiguas.
+     */
     @Scheduled(fixedDelay = 30000)
     public void autoEndOldSessions() {
         long now = System.currentTimeMillis();

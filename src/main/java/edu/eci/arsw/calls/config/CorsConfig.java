@@ -9,12 +9,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 
+/**
+ * CORS configuracion para la aplicación.
+ */
 @Configuration
 public class CorsConfig {
 
     @Value("${uplearn.cors.allowed-origins:http://localhost:3000}")
     private String allowedOrigins;
 
+    /**
+     * Configura las políticas de CORS para la aplicación.
+     * 
+     * @return Fuente de configuración CORS.
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();

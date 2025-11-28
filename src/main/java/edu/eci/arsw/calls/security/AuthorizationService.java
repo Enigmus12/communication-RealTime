@@ -10,11 +10,20 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 
+/**
+ * Servicio de autorización para manejar y validar tokens JWT.
+ */
 @Service
 public class AuthorizationService {
     private final ObjectMapper om = new ObjectMapper();
     private static final String ROLES_CLAIM = "roles";
 
+    /**
+     * Parsea el encabezado Bearer para extraer la información de autenticación.
+     * 
+     * @param bearer El encabezado Authorization con el token Bearer.
+     * @return La información de autenticación extraída del token.
+     */
     public AuthInfo parseBearer(String bearer) {
         if (bearer == null || bearer.isBlank())
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Falta Authorization");
@@ -24,22 +33,41 @@ public class AuthorizationService {
         return parseJwt(token);
     }
 
+    /**
+     * Parsea un token proporcionado directamente o desde cookies.
+     * 
+     * @param token   El token JWT.
+     * @param cookies Las cookies HTTP disponibles.
+     * @return La información de autenticación extraída del token.
+     */
     public AuthInfo parseTokenOrCookie(String token, Cookie[] cookies) {
         String bearer = null;
-        if (token != null && !token.isBlank()) bearer = "Bearer " + token;
+        if (token != null && !token.isBlank())
+            bearer = "Bearer " + token;
         if (bearer == null && cookies != null) {
             for (Cookie c : cookies) {
-                if ("access_token".equals(c.getName())) { bearer = "Bearer " + c.getValue(); break; }
+                if ("access_token".equals(c.getName())) {
+                    bearer = "Bearer " + c.getValue();
+                    break;
+                }
             }
         }
-        if (bearer == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Falta token");
+        if (bearer == null)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Falta token");
         return parseBearer(bearer);
     }
 
+    /**
+     * Parsea un token JWT para extraer la información de autenticación.
+     * 
+     * @param jwt El token JWT.
+     * @return La información de autenticación extraída del token.
+     */
     private AuthInfo parseJwt(String jwt) {
         try {
             String[] parts = jwt.split("\\.");
-            if (parts.length < 2) throw new IllegalArgumentException("JWT inválido");
+            if (parts.length < 2)
+                throw new IllegalArgumentException("JWT inválido");
             String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
             JsonNode payload = om.readTree(payloadJson);
 
@@ -67,5 +95,12 @@ public class AuthorizationService {
         }
     }
 
-    public record AuthInfo(String userId, List<String> roles) {}
+    /**
+     * Información de autenticación extraída del token.
+     * 
+     * @param userId El ID del usuario.
+     * @param roles  Los roles asociados al usuario.
+     */
+    public record AuthInfo(String userId, List<String> roles) {
+    }
 }
