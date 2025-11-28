@@ -1,46 +1,33 @@
+# .github/workflows/ci-sonar.yml
 name: CI (Maven + JaCoCo + SonarCloud)
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]   
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch: {}                         
 
 permissions:
   contents: read
-  packages: write  # por si luego publicas a GHCR; no afecta hoy
 
 jobs:
   build-and-sonar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-
+        with:
+          fetch-depth: 0
       - name: Set up Temurin JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: maven
-
       - name: Build + Tests (JaCoCo)
         run: mvn -B -DskipITs clean verify
-
       - name: SonarCloud (mvn sonar:sonar)
         if: ${{ secrets.SONAR_TOKEN != '' }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: mvn -B sonar:sonar -Dsonar.token=${SONAR_TOKEN} -Dsonar.qualitygate.wait=true
-
-      # --- Docker: build de la imagen (smoke) ---
-      - name: Docker metadata
-        id: meta
-        run: echo "tag=call-service:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Build Docker image
-        run: docker build -t ${{ steps.meta.outputs.tag }} .
-      
-      # (Opcional) validar compose sin levantar contenedores
-      - name: (Optional) Validate docker compose file
-        run: docker compose config
