@@ -1,0 +1,11 @@
+services:
+  call-service:
+    image: call-service:latest
+    container_name: uplearn-calls
+    ports:
+      - "8093:8093"
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+    env_file:
+      - .env
