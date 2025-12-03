@@ -15,7 +15,7 @@ import java.util.Arrays;
 @Configuration
 public class CorsConfig {
 
-    @Value("${uplearn.cors.allowed-origins:http://localhost:3000}")
+    @Value("${uplearn.cors.allowed-origins:https://uplearnfront.duckdns.org}")
     private String allowedOrigins;
 
     /**

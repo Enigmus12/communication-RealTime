@@ -1,52 +1,11 @@
 services:
   call-service:
-    build: .
-    container_name: call-service
+    image: call-service:latest
+    container_name: uplearn-calls
     ports:
       - "8093:8093"
-    env_file: .env
+    restart: unless-stopped
     environment:
-      SERVER_PORT: "8093"
-      JAVA_TOOL_OPTIONS: "-Dserver.port=8093"
-
-      USERS_BASE: "http://host.docker.internal:8080/Api-user"
-      REDIS_HOST: "host.docker.internal"
-      REDIS_PORT: "6379"
-
-      UPLEARN_ALLOWED_ORIGINS: "${UPLEARN_ALLOWED_ORIGINS}"
-
-      STUN_URLS: "${STUN_URLS}"
-      TURN_URLS: "${TURN_URLS}"
-      TURN_USERNAME: "${TURN_USERNAME}"
-      TURN_PASSWORD: "${TURN_PASSWORD}"
-
-    depends_on:
-      - coturn
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - uplearn_net
-
-  coturn:
-    image: instrumentisto/coturn
-    container_name: coturn
-    ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-    environment:
-      - TURN_USERNAME=${TURN_USERNAME}
-      - TURN_PASSWORD=${TURN_PASSWORD}
-    command: >
-      --lt-cred-mech
-      --user ${TURN_USERNAME}:${TURN_PASSWORD}
-      --fingerprint
-      --realm uplearn.local
-      --no-cli
-      --no-tls
-      --no-dtls
-    networks:
-      - uplearn_net
-
-networks:
-  uplearn_net:
-    driver: bridge
+      - SPRING_PROFILES_ACTIVE=production
+    env_file:
+      - .env
