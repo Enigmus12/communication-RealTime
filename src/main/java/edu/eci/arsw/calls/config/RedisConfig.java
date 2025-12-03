@@ -12,9 +12,10 @@ import org.springframework.data.redis.listener.*;
  */
 @Configuration
 public class RedisConfig {
-    @Value("${REDIS_HOST:localhost}")
+    @Value("${redis.host:localhost}")
     private String host;
-    @Value("${REDIS_PORT:6379}")
+
+    @Value("${redis.port:6379}")
     private int port;
 
     @Bean

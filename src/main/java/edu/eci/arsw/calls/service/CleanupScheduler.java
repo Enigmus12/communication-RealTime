@@ -18,8 +18,9 @@ public class CleanupScheduler {
     private final CallSessionService service;
     private final long maxMinutesMs;
 
-    public CleanupScheduler(CallSessionRepository repo, CallSessionService service,
-            @Value("${CALL_MAX_MINUTES:60}") long maxMinutes) {
+    public CleanupScheduler(CallSessionRepository repo,
+            CallSessionService service,
+            @Value("${call.max-minutes:60}") long maxMinutes) {
         this.repo = repo;
         this.service = service;
         this.maxMinutesMs = maxMinutes * 60_000L;

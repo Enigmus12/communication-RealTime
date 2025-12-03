@@ -22,7 +22,8 @@ public class EligibilityService {
     private static final ParameterizedTypeReference<Map<String, Object>> RESPONSE_TYPE = 
         new ParameterizedTypeReference<>() {};
 
-    public EligibilityService(@Value("${RESERVATIONS_BASE:http://localhost:8090/api/reservations}") String baseUrl) {
+    public EligibilityService(
+            @Value("${reservations.base:http://localhost:8090/api/reservations}") String baseUrl) {
         this.baseUrl = baseUrl;
         this.schedulerClient = RestClient.builder().baseUrl(baseUrl).build();
     }

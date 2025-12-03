@@ -19,7 +19,8 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Value("${app.ws.max-message-size:65536}")
     private int maxMessageSize;
-    @Value("${WS_IDLE_TIMEOUT_SECONDS:30}")
+
+    @Value("${app.ws.idle-timeout-seconds:30}")
     private long idleTimeout;
 
     public WebSocketConfig(CallWebSocketHandler handler, WsAuthHandshakeInterceptor interceptor) {
@@ -27,11 +28,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
         this.interceptor = interceptor;
     }
 
-    /**
-     * Registra los manejadores de WebSocket y sus interceptores.
-     *
-     * @param registry Registro de manejadores de WebSocket.
-     */
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/call")
@@ -39,12 +35,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
                 .setAllowedOriginPatterns("*");
     }
 
-    /**
-     * Configura el contenedor de WebSocket con tamaños de mensajes y tiempos de
-     * espera.
-     *
-     * @return ServletServerContainerFactoryBean configurado.
-     */
     @Bean
     public ServletServerContainerFactoryBean createWebSocketContainer() {
         ServletServerContainerFactoryBean c = new ServletServerContainerFactoryBean();
