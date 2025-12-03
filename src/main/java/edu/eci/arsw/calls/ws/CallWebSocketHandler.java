@@ -48,10 +48,10 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
     private final Set<String> subscribedChannels = ConcurrentHashMap.newKeySet();
 
     public CallWebSocketHandler(SessionRegistry registry,
-                                CallSessionService callService,
-                                EligibilityService eligibilityService,
-                                RedisPubSubBridge bridge,
-                                @Value("${WS_RATE_LIMIT:20}") int rateLimit) {
+            CallSessionService callService,
+            EligibilityService eligibilityService,
+            RedisPubSubBridge bridge,
+            @Value("${app.ws.rate-limit:20}") int rateLimit) {
         this.registry = registry;
         this.callService = callService;
         this.eligibilityService = eligibilityService;
@@ -168,8 +168,8 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
      * @throws IOException Si ocurre un error de E/S.
      */
     private boolean validateUserAndSession(WebSocketSession session,
-                                           String userId,
-                                           MessageEnvelope env) throws IOException {
+            String userId,
+            MessageEnvelope env) throws IOException {
         if (userId == null || userId.isBlank()) {
             sendError(session, "Missing user identity");
             session.close(CloseStatus.NOT_ACCEPTABLE);
@@ -201,13 +201,13 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
     /**
      * Valida el ID de reserva.
      *
-     * @param session              Sesión WebSocket.
+     * @param session               Sesión WebSocket.
      * @param resolvedReservationId ID de la reserva resuelta.
      * @return true si la validación es exitosa, false en caso contrario.
      * @throws IOException Si ocurre un error de E/S.
      */
     private boolean validateReservation(WebSocketSession session,
-                                        String resolvedReservationId) throws IOException {
+            String resolvedReservationId) throws IOException {
         if (resolvedReservationId == null || resolvedReservationId.isBlank()) {
             sendError(session, "Missing reservationId and unknown sessionId");
             session.close(CloseStatus.NOT_ACCEPTABLE);
@@ -226,8 +226,8 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
      * @throws IOException Si ocurre un error de E/S.
      */
     private boolean checkEligibility(WebSocketSession session,
-                                     String userId,
-                                     String reservationId) throws IOException {
+            String userId,
+            String reservationId) throws IOException {
         String bearer = (String) session.getAttributes().get("token");
         var elig = eligibilityService.checkReservation(reservationId, userId, bearer);
         if (!elig.eligible()) {
@@ -241,12 +241,12 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
     /**
      * Obtiene o crea una sesión de llamada basada en el ID de reserva.
      *
-     * @param env                    Mensaje recibido.
+     * @param env                   Mensaje recibido.
      * @param resolvedReservationId ID de la reserva resuelta.
      * @return Sesión de llamada existente o nueva.
      */
     private CallSession getOrCreateCallSession(MessageEnvelope env,
-                                               String resolvedReservationId) {
+            String resolvedReservationId) {
         return callService.findBySessionId(env.sessionId)
                 .map(existing -> {
                     if (!Objects.equals(existing.getReservationId(), resolvedReservationId)) {
@@ -271,13 +271,13 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
     /**
      * Asegura que la sesión no exceda la capacidad máxima de participantes.
      *
-     * @param session       Sesión WebSocket.
+     * @param session      Sesión WebSocket.
      * @param currentCount Número actual de participantes.
      * @return true si hay capacidad, false en caso contrario.
      * @throws IOException Si ocurre un error de E/S.
      */
     private boolean ensureCapacity(WebSocketSession session,
-                                   int currentCount) throws IOException {
+            int currentCount) throws IOException {
         if (currentCount >= 2) {
             sendError(session, "Room full");
             session.close(CloseStatus.NOT_ACCEPTABLE);
@@ -294,8 +294,8 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
      * @param cs      Sesión de llamada.
      */
     private void registerParticipant(WebSocketSession session,
-                                     String userId,
-                                     CallSession cs) {
+            String userId,
+            CallSession cs) {
         registry.register(cs.getSessionId(), userId, session);
         session.getAttributes().put("callSessionId", cs.getSessionId());
         session.getAttributes().put("callUserId", userId);
@@ -348,10 +348,10 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
      * @throws IOException Si ocurre un error de E/S.
      */
     private void sendJoinAck(WebSocketSession session,
-                             String userId,
-                             MessageEnvelope env,
-                             CallSession cs,
-                             boolean initiator) throws IOException {
+            String userId,
+            MessageEnvelope env,
+            CallSession cs,
+            boolean initiator) throws IOException {
         MessageEnvelope ack = new MessageEnvelope();
         ack.type = "JOIN_ACK";
         ack.sessionId = cs.getSessionId();
@@ -458,8 +458,7 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
                 left.ts = System.currentTimeMillis();
                 bridge.publish(
                         CALL_CHANNEL_PREFIX + sid,
-                        new ObjectMapper().writeValueAsString(left)
-                );
+                        new ObjectMapper().writeValueAsString(left));
             }
         } catch (Exception ignore) {
             /* noop */ }

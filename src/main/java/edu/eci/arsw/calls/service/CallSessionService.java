@@ -24,15 +24,16 @@ public class CallSessionService {
     private final AtomicInteger concurrentCalls = new AtomicInteger(0);
     private final long maxMinutes;
 
-    public CallSessionService(CallSessionRepository repo, MeterRegistry meterRegistry, 
-            QualityMetricsService qualityMetrics,
-            @Value("${CALL_MAX_MINUTES:60}") long maxMinutes) {
+    public CallSessionService(CallSessionRepository repo,
+                              MeterRegistry meterRegistry,
+                              QualityMetricsService qualityMetrics,
+                              @Value("${call.max-minutes:60}") long maxMinutes) {
         this.repo = repo;
         this.qualityMetrics = qualityMetrics;
         this.maxMinutes = maxMinutes;
-        Gauge.builder("calls.concurrent", concurrentCalls, AtomicInteger::get).register(meterRegistry);
+        Gauge.builder("calls.concurrent", concurrentCalls, AtomicInteger::get)
+                .register(meterRegistry);
     }
-
     /**
      * Crea una nueva sesión de llamada o devuelve una existente para la reserva
      * dada.
